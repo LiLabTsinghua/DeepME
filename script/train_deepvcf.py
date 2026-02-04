@@ -19,16 +19,16 @@ from utils import set_seeds
 # 2. Change `config.test_path` to the right test path for metabolic/non-metabolic/cross-species prediction.
 # 3. Change `config.model_saved_dir` to the desired output directory for saving models.
 # 4. Assign a specific name to `config.model_name` to identify different training runs.
-# 5. If training DeepVCF_PreFT, enable model.train_tpn(pre_data_list). Note it will significantly extend the training time due to the massive amount of data.
+# 5. If training DeepVCF_PreFT, add the path of the mechanistic pretrain data to `config['mechanistic_pretrain_path']`. Note it will significantly extend the training time due to the massive amount of data.
 
 # change config
 #-----------------------------------------------------
 config = {
-    'device': 'cuda:4',
+    'device': 'cuda:1',
     'seed':20260109,
 
     'kg_path': '../data/KG/ECO/kg_enhanced.txt',
-    'mechanistic_pretrain_path':'../data/me_data/train_data/eco_fseof_1_6.txt',
+    'mechanistic_pretrain_path':'../data/me_data/train_data/eco_fseof_1_6.txt',  # NOTE:if not pretrain, set to ""
     'train_path':'../data/me_data/train_data/train.txt',
     'test_path':'../data/me_data/metabolic_gene/combined_test.txt',
 
@@ -54,7 +54,7 @@ config = {
     'tpn_eval_interval':1,
     'tpn_patience':30,
 
-    'model_saved_dir':'../trained_model/DeepVCF_ECO/',
+    'model_saved_dir':'../trained_model/DeepVCF_PreFT_ECO/',
     'model_name':'DeepVCF_k10_20260109',
 }
 
@@ -74,13 +74,14 @@ knowledge,coverage = k_processor.process()
 num_nodes, num_edge_type, task_rel = knowledge.num_nodes, knowledge.num_edge_type, knowledge.task_rel.to(config['device'])
 
 # load data
-d1_processor = DeepVCF_Data(config['mechanistic_pretrain_path'], config['test_path'],
-                        config['model_saved_dir'],
-                        ensemble=True,
-                        k=config['k'],
-                        seed=config['seed'],
-                        )
-pre_data_list = d1_processor.process()
+if config['mechanistic_pretrain_path'] != '':
+    d1_processor = DeepVCF_Data(config['mechanistic_pretrain_path'], config['test_path'],
+                            config['model_saved_dir'],
+                            ensemble=True,
+                            k=config['k'],
+                            seed=config['seed'],
+                            )
+    pre_data_list = d1_processor.process()
 
 d_processor = DeepVCF_Data(config['train_path'], config['test_path'],
                         config['model_saved_dir'],
@@ -98,7 +99,8 @@ model = DeepVCF_Model(config, num_nodes, num_edge_type, task_rel,
 model.train_drn(knowledge)
 
 # pre-train tpn
-# model.train_tpn(pre_data_list)
+if config['mechanistic_pretrain_path'] != '':
+    model.train_tpn(pre_data_list)
 
 # tpn training
 model.train_tpn(true_data_list)
